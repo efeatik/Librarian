@@ -18,5 +18,8 @@ Bakırçay Üniversitesi Bilgisayar Mühendisliği Bölümü "Mühendislikte Pro
 ## Kurulum ve Çalıştırma
 
 1. Repoyu bilgisayarınıza klonlayın:
-   ```bash
-   git clone [https://github.com/efeatik/Librarian.git](https://github.com/efeatik/Librarian.git)
+   [span_13](start_span)`git clone https://github.com/efeatik/Librarian`[span_13](end_span)
+2. Gerekli kütüphaneleri yükleyin:
+   `pip install pygame`
+3. Ana dizindeki başlatıcı dosyayı çalıştırın:
+   `python main.py`
