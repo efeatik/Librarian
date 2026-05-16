@@ -163,4 +163,68 @@ class LibrarySystem:
     def get_user_active_loans(self, username):
         """Kullanıcının aktif ödünç alım işlemlerini döndürür."""
         active = []
-        for
+        for transaction in self.transactions:
+            if (transaction["username"] == username and 
+                not transaction["returned"]):
+                active.append(transaction)
+        return active
+
+    def authenticate_user(self, username, password):
+        """Kullanıcı kimlik doğrulaması yapar."""
+        if username in self.users:
+            stored_hash = self.users[username]["password"]
+            if stored_hash == self._hash_password(password):
+                return self.users[username]["role"]
+        return None
+
+    def create_user(self, admin_username, username, password, role):
+        """Yeni kullanıcı oluşturur."""
+        # Sadece yönetici kullanıcılar yeni kullanıcı oluşturabilir
+        if self.users.get(admin_username, {}).get("role") != "Yönetici":
+            return False, "Yeterli yetki yok."
+        
+        if username in self.users:
+            return False, "Kullanıcı zaten mevcut."
+        
+        self.users[username] = {
+            "password": self._hash_password(password),
+            "role": role
+        }
+        self.save_users()
+        return True, "Kullanıcı başarıyla oluşturuldu."
+
+    def get_all_books(self):
+        """Tüm kitapları döndürür."""
+        books_list = []
+        for isbn, info in self.books.items():
+            books_list.append((isbn, info["title"], info["author"], info["stock"]))
+        return books_list
+
+    def search_books(self, query):
+        """Kitapları arar."""
+        results = []
+        for isbn, info in self.books.items():
+            if (query.lower() in info["title"].lower() or 
+                query.lower() in info["author"].lower() or 
+                query == isbn):
+                results.append((isbn, info["title"], info["author"], info["stock"]))
+        return results
+
+    def get_user_transactions(self, username):
+        """Kullanıcının tüm işlemlerini döndürür."""
+        user_transactions = []
+        for transaction in self.transactions:
+            if transaction["username"] == username:
+                user_transactions.append(transaction)
+        return user_transactions
+
+    def get_overdue_books(self):
+        """Geçmiş cezalı kitapları döndürür."""
+        overdue = []
+        current_time = datetime.now()
+        for transaction in self.transactions:
+            if (not transaction["returned"]):
+                due_date = datetime.fromisoformat(transaction["due_date"])
+                if current_time > due_date:
+                    overdue.append(transaction)
+        return overdue
