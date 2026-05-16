@@ -229,3 +229,30 @@ class LibrarySystem:
     def get_user_role(self, username):
         """Kullanıcının rolünü döndürür."""
         return self.users.get(username, {}).get("role")
+
+    def create_user(self, creator_role, new_username, new_password, new_role):
+        """Yeni kullanıcı oluşturur ve RBAC kontrolü yapar."""
+        # RBAC kontrolü
+        if creator_role == "Yönetici":
+            # Yönetici tüm rolleri oluşturabilir
+            if new_role not in ["Yönetici", "Personel", "Öğrenci"]:
+                return False, "Geçersiz rol."
+        elif creator_role == "Personel":
+            # Personel sadece Öğrenci rolünü oluşturabilir
+            if new_role != "Öğrenci":
+                return False, "Yetkisiz işlem."
+        else:
+            return False, "Yetkisiz işlem."
+        
+        # Kullanıcı adının benzersiz olup olmadığını kontrol et
+        if new_username in self.users:
+            return False, "Kullanıcı zaten var."
+        
+        # Yeni kullanıcıyı oluştur
+        hashed_password = self._hash_password(new_password)
+        self.users[new_username] = {
+            "password": hashed_password,
+            "role": new_role
+        }
+        self.save_data()
+        return True, "Kullanıcı başarıyla oluşturuldu."
