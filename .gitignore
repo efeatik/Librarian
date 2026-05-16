@@ -1,0 +1,8 @@
+# Kütüphane Veritabanı Dosyaları
+kitaplar.json
+kullanicilar.json
+islem.json
+
+# Python Önbellek Dosyaları (Python'ın otomatik oluşturduğu gereksiz dosyalar)
+__pycache__/
+*.pyc
