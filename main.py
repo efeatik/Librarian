@@ -182,7 +182,13 @@ def main():
                     new_password = new_pass_input.text
                     new_role = "Öğrenci"  # Varsayılan rol
                     if new_role_selector:
-                        selected_role = new_role_selector.get_selected()
+                        selected_role = new_role_selector.get_selected_role()  # FIXED: get_selected_role kullanılıyor
+                        if selected_role:
+                            new_role = selected_role
+                    success, message = db.create_user(logged_in_role, new_username, new_password, new_role)
+                    ui_message = message
+                    new_user_input.clear()
+                    new_pass_input.clear()
                         if selected_role:
                             new_role = selected_role
                     
