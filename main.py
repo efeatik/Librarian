@@ -111,31 +111,93 @@ def main():
                 if logged_in_role == "Yönetici":
                     if btn_users.handle_event(event): print("Kullanıcı Yönetimi Sekmesi")
 
-                mouse_x, mouse_y = pygame.mouse.get_pos()
-                clip_rect = pygame.Rect(250, 185, 750, 550)
-
                 # Scroll İşlemi (Sadece farenin x pozisyonu tablonun üzerindeyse çalışsın)
                 mouse_x, _ = pygame.mouse.get_pos()
                 if event.type == pygame.MOUSEWHEEL and mouse_x > 220:
                     scroll_y += event.y * scroll_speed
                 
-                # Sadece fare tablo alanındaysa buton tıklamalarını dinle
-                if clip_rect.collidepoint(mouse_x, mouse_y):
-                    for i, btn in enumerate(borrow_buttons):
-                        stok_sayisi = int(dummy_books[i][3])
-                        
-                        # Eğer stok 0'dan büyükse ve öğrenci yetkisiyle girildiyse
-                        if stok_sayisi > 0 and logged_in_role == "Öğrenci":
-                            # Butonun çizim pozisyonunu güncelle ve ekrana bas
-                            borrow_buttons[index].rect.y = row_y
-                            borrow_buttons[index].draw(screen)
-                        elif logged_in_role in ["Personel", "Yönetici"]:
-                            # Personel görüyorsa düzenle butonu olabilir, şimdilik boş
-                            pass 
-                    else:
-                        # Stok bittiyse butonu gizle, kırmızı uyarı yazısı koy
+                # Buton tıklamalarını dinle (Sadece tablo alanındaysa)
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    clip_rect = pygame.Rect(250, 185, 750, 550)
+                    if clip_rect.collidepoint(mouse_x, mouse_y):
+                        for i, btn in enumerate(borrow_buttons):
+                            # Butonun konumunu hesapla ve tıklama kontrolü yap
+                            row_y = 185 + (i * item_height) - scroll_y
+                            btn.rect.y = row_y
+                            if btn.rect.collidepoint(mouse_x, mouse_y):
+                                # Ödünç alma işlemi
+                                print(f"{dummy_books[i][1]} kitabını ödünç aldınız.")
+                                break
+
+        # === ÇİZİM (RENDERING) ===
+        screen.fill(config.WHITE)
+        
+        # === GİRİŞ EKRANI ÇİZİMİ ===
+        if current_state == config.STATE_LOGIN:
+            # Başlık
+            title = title_font.render("Librarian - Giriş", True, config.BLACK)
+            screen.blit(title, (340, 150))
+            
+            # Rol Seçici
+            role_selector.draw(screen)
+            # Kullanıcı Adı
+            user_input.draw(screen)
+            # Şifre
+            pass_input.draw(screen)
+            # Giriş Butonu
+            login_btn.draw(screen)
+            
+        # === ANA EKRAN ÇİZİMİ ===
+        elif current_state == config.STATE_USER:
+            # Sol Menü
+            btn_library.draw(screen)
+            btn_profile.draw(screen)
+            if logged_in_role in ["Personel", "Yönetici"]:
+                btn_inventory.draw(screen)
+                btn_penalties.draw(screen)
+            if logged_in_role == "Yönetici":
+                btn_users.draw(screen)
+            
+            # Sağ Taraf Başlık
+            title = title_font.render("Kitaplık", True, config.BLACK)
+            screen.blit(title, (250, 30))
+            
+            # Arama Alanı
+            search_input.draw(screen)
+            search_btn.draw(screen)
+            logout_btn.draw(screen)
+            
+            # Kitap Tablosu Başlıkları
+            header_y = 185
+            for i, header in enumerate(headers):
+                text_surf = sidebar_font.render(header, True, config.BLACK)
+                screen.blit(text_surf, (250 + i * 120, header_y))
+            
+            # Kitap Verileri ve Butonlar
+            clip_rect = pygame.Rect(250, 185, 750, 550)
+            screen.set_clip(clip_rect)
+            
+            for i, book in enumerate(dummy_books):
+                row_y = 185 + (i * item_height) - scroll_y
+                if row_y > 185 and row_y < 735:  # Sadece ekranın içindekileri çiz
+                    # Kitap bilgilerini yaz
+                    for j, data in enumerate(book):
+                        text_surf = font.render(str(data), True, config.BLACK)
+                        screen.blit(text_surf, (250 + j * 120, row_y + 5))
+                    
+                    # Ödünç Al Butonu (Sadece öğrenci ve stok varsa)
+                    stok_sayisi = int(book[3])
+                    if stok_sayisi > 0 and logged_in_role == "Öğrenci":
+                        borrow_buttons[i].rect.y = row_y
+                        borrow_buttons[i].draw(screen)
+                    elif stok_sayisi == 0:
+                        # Stokta yoksa uyarı yazısı
                         out_surf = sidebar_font.render("Stokta Yok", True, (200, 0, 0))
                         screen.blit(out_surf, (850, row_y + 5))
+                    elif logged_in_role in ["Personel", "Yönetici"]:
+                        # Personel ve Yönetici için başka işlemler olabilir
+                        pass
                     
             screen.set_clip(None)
             
