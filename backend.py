@@ -1,16 +1,16 @@
-# backend.py
-
 import json
 import hashlib
 import os
 from datetime import datetime, timedelta
 
 class LibrarySystem:
-    def __init__(self, users_file="kullanicilar.json", books_file="kitaplar.json"):
+    def __init__(self, users_file="kullanicilar.json", books_file="kitaplar.json", transactions_file="islemler.json"):
         self.users_file = users_file
         self.books_file = books_file
+        self.transactions_file = transactions_file
         self.users = {}  # Kullanıcılar: username -> {password, role}
         self.books = {}  # Kitaplar: isbn -> {title, author, stock, ...}
+        self.transactions = []  # İşlemler: list of {username, isbn, borrow_date, due_date}
         self.load_data()
 
     def load_data(self):
@@ -44,37 +44,30 @@ class LibrarySystem:
         else:
             # Varsayılan kitaplar
             self.books = {
-                "978-01": {
-                    "title": "İnsanlığımı Yitirirken",
-                    "author": "Osamu Dazai",
-                    "stock": 3,
-                    "category": "Roman"
+                "9780134685991": {
+                    "title": "Effective Java",
+                    "author": "Joshua Bloch",
+                    "stock": 3
                 },
-                "978-02": {
-                    "title": "Yeraltından Notlar",
-                    "author": "Dostoyevski",
-                    "stock": 5,
-                    "category": "Roman"
+                "9780596009205": {
+                    "title": "JavaScript: The Good Parts",
+                    "author": "Douglas Crockford",
+                    "stock": 2
                 },
-                "978-03": {
-                    "title": "Budala",
-                    "author": "Dostoyevski",
-                    "stock": 2,
-                    "category": "Roman"
-                },
-                "978-04": {
-                    "title": "Beyaz Geceler",
-                    "author": "Dostoyevski",
-                    "stock": 0,
-                    "category": "Roman"
-                },
-                "978-05": {
-                    "title": "Öteki",
-                    "author": "Dostoyevski",
-                    "stock": 1,
-                    "category": "Roman"
+                "9780131103627": {
+                    "title": "Design Patterns",
+                    "author": "Gang of Four",
+                    "stock": 1
                 }
             }
+            self.save_data()
+
+        # İşlemler dosyasını yükle
+        if os.path.exists(self.transactions_file):
+            with open(self.transactions_file, 'r', encoding='utf-8') as f:
+                self.transactions = json.load(f)
+        else:
+            self.transactions = []
             self.save_data()
 
     def save_data(self):
@@ -83,129 +76,155 @@ class LibrarySystem:
             json.dump(self.users, f, ensure_ascii=False, indent=4)
         with open(self.books_file, 'w', encoding='utf-8') as f:
             json.dump(self.books, f, ensure_ascii=False, indent=4)
+        with open(self.transactions_file, 'w', encoding='utf-8') as f:
+            json.dump(self.transactions, f, ensure_ascii=False, indent=4)
 
     def _hash_password(self, password):
         """SHA-256 ile şifre hash'ler."""
-        return hashlib.sha256(password.encode('utf-8')).hexdigest()
+        return hashlib.sha256(password.encode()).hexdigest()
 
     def authenticate_user(self, username, password):
-        """
-        Kullanıcı kimlik doğrulaması yapar.
-        Returns: role string if successful, None otherwise.
-        """
-        if username in self.users:
-            stored_hash = self.users[username]["password"]
-            input_hash = self._hash_password(password)
-            if stored_hash == input_hash:
-                return self.users[username]["role"]
+        """Kullanıcı kimlik doğrulaması yapar."""
+        hashed_password = self._hash_password(password)
+        user = self.users.get(username)
+        if user and user.get("password") == hashed_password:
+            return user.get("role")
         return None
 
-    def get_all_books_as_list(self):
-        """
-        Kitapları list formatında döndürür.
-        Format: [[isbn, title, author, stock, status], ...]
-        """
-        book_list = []
-        for isbn, book in self.books.items():
-            stock = book["stock"]
-            status = "Müsait" if stock > 0 else "Ödünç Verildi"
-            book_list.append([
-                isbn,
-                book["title"],
-                book["author"],
-                str(stock),
-                status
-            ])
-        return book_list
+    def get_all_books(self):
+        """Tüm kitapları döndürür."""
+        return list(self.books.values())
 
     def search_books(self, query):
-        """
-        Kitapları başlık, yazar veya ISBN'a göre arar.
-        KMP algoritması yerine Python'un optimize edilmiş 'in' operatörü kullanılır.
-        """
-        results = []
+        """Kitapları başlık veya yazarına göre arar."""
         query = query.lower()
+        results = []
         for isbn, book in self.books.items():
-            if (query in isbn.lower() or
-                query in book["title"].lower() or
+            if (query in book["title"].lower() or 
                 query in book["author"].lower()):
-                stock = book["stock"]
-                status = "Müsait" if stock > 0 else "Ödünç Verildi"
-                results.append([
-                    isbn,
-                    book["title"],
-                    book["author"],
-                    str(stock),
-                    status
-                ])
+                book_copy = book.copy()
+                book_copy["isbn"] = isbn
+                results.append(book_copy)
         return results
 
     def get_book_by_isbn(self, isbn):
-        """ISBN'e göre tek bir kitap döndürür."""
+        """ISBN ile kitabı döndürür."""
         return self.books.get(isbn)
 
-    def add_book(self, isbn, title, author, stock=0, category=""):
+    def add_book(self, isbn, title, author, stock):
         """Yeni kitap ekler."""
-        if isbn in self.books:
-            return False  # ISBN zaten var
         self.books[isbn] = {
             "title": title,
             "author": author,
-            "stock": stock,
-            "category": category
+            "stock": stock
         }
         self.save_data()
-        return True
 
-    def update_book(self, isbn, title=None, author=None, stock=None, category=None):
+    def update_book(self, isbn, title=None, author=None, stock=None):
         """Kitap bilgilerini günceller."""
-        if isbn not in self.books:
-            return False
-        book = self.books[isbn]
-        if title is not None:
-            book["title"] = title
-        if author is not None:
-            book["author"] = author
-        if stock is not None:
-            book["stock"] = stock
-        if category is not None:
-            book["category"] = category
-        self.save_data()
-        return True
+        if isbn in self.books:
+            if title is not None:
+                self.books[isbn]["title"] = title
+            if author is not None:
+                self.books[isbn]["author"] = author
+            if stock is not None:
+                self.books[isbn]["stock"] = stock
+            self.save_data()
 
     def delete_book(self, isbn):
         """Kitabı siler."""
         if isbn in self.books:
             del self.books[isbn]
             self.save_data()
-            return True
-        return False
 
-    def borrow_book(self, user_id, isbn):
-        """
-        Kitap ödünç verilir.
-        Returns: True if successful, False otherwise.
-        """
+    def borrow_book(self, username, isbn):
+        """Kitap ödünç alır."""
+        # Kitap yoksa veya stok yoksa
         if isbn not in self.books:
-            return False
+            return False, "Kitap bulunamadı."
         book = self.books[isbn]
         if book["stock"] <= 0:
-            return False  # Stok yok
+            return False, "Kitap stokta yok."
+        
+        # Kullanıcının geçici cezalı olup olmadığını kontrol et
+        overdue_books = self.get_user_overdue_books(username)
+        if overdue_books:
+            return False, "Geçici cezalısınız. Geçmiş cezalı kitapları iade edin."
+
+        # Yeni işlem oluştur
+        borrow_date = datetime.now().isoformat()
+        due_date = (datetime.now() + timedelta(days=15)).isoformat()  # 15 gün ödünç
+        
+        transaction = {
+            "username": username,
+            "isbn": isbn,
+            "borrow_date": borrow_date,
+            "due_date": due_date,
+            "returned": False
+        }
+        
+        self.transactions.append(transaction)
         book["stock"] -= 1
         self.save_data()
-        return True
+        return True, "Kitap başarıyla ödünç alındı."
 
-    def return_book(self, user_id, isbn):
-        """
-        Kitap iade edilir.
-        Returns: True if successful, False otherwise.
-        """
+    def return_book(self, username, isbn):
+        """Kitap iade eder."""
+        # Kitap yoksa
         if isbn not in self.books:
-            return False
+            return False, "Kitap bulunamadı."
+        
+        # İşlemi bul
+        transaction = None
+        for t in self.transactions:
+            if (t["username"] == username and 
+                t["isbn"] == isbn and 
+                not t["returned"]):
+                transaction = t
+                break
+        
+        if not transaction:
+            return False, "Bu kitap ödünç alınmamış veya zaten iade edilmiş."
+        
+        # Kitabı iade et
         book = self.books[isbn]
         book["stock"] += 1
+        
+        # İşlemi iade edildi olarak işaretle
+        transaction["returned"] = True
+        transaction["return_date"] = datetime.now().isoformat()
+        
         self.save_data()
-        return True
+        return True, "Kitap başarıyla iade edildi."
+
+    def get_user_overdue_books(self, username):
+        """Kullanıcının geçici cezalı kitaplarını döndürür."""
+        overdue = []
+        current_time = datetime.now()
+        for transaction in self.transactions:
+            if (transaction["username"] == username and 
+                not transaction["returned"]):
+                due_date = datetime.fromisoformat(transaction["due_date"])
+                if current_time > due_date:
+                    overdue.append(transaction)
+        return overdue
+
+    def get_user_active_loans(self, username):
+        """Kullanıcının aktif ödünç alım işlemlerini döndürür."""
+        active = []
+        for transaction in self.transactions:
+            if (transaction["username"] == username and 
+                not transaction["returned"]):
+                active.append(transaction)
+        return active
+
+    def get_user_transaction_history(self, username):
+        """Kullanıcının işlem geçmişini döndürür."""
+        history = []
+        for transaction in self.transactions:
+            if transaction["username"] == username:
+                history.append(transaction)
+        return history
 
     def get_user_role(self, username):
         """Kullanıcının rolünü döndürür."""

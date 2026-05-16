@@ -1,5 +1,3 @@
-# main.py
-
 import pygame
 import config
 from ui_elements import Button, TextBox, RoleSelector
@@ -42,7 +40,7 @@ def main():
     
     # --- BOOK DATA INITIALIZATION ---
     # Dummy veri yerine backend'ten kitapları al
-    dummy_books = db.get_all_books_as_list()
+    dummy_books = db.get_all_books()
     
     # Durum Yönetimi
     current_state = config.STATE_LOGIN
@@ -63,6 +61,14 @@ def main():
         # X koordinatı 850, Y koordinatı geçici olarak 0 veriliyor (Scroll'da güncellenecek)
         btn = Button(850, 0, 100, 30, "Ödünç Al", font)
         borrow_buttons.append(btn)
+
+    # === LOGO INTEGRATION ===
+    logo = None
+    try:
+        logo = pygame.image.load("logo.png")
+        logo = pygame.transform.scale(logo, (150, 150))
+    except pygame.error:
+        pass  # Logo bulunamazsa None kalır
 
     while running:
         events = pygame.event.get()
@@ -127,8 +133,21 @@ def main():
                             btn.rect.y = row_y
                             if btn.rect.collidepoint(mouse_x, mouse_y):
                                 # Ödünç alma işlemi
-                                print(f"{dummy_books[i][1]} kitabını ödünç aldınız.")
+                                success, message = db.borrow_book(logged_in_role, dummy_books[i][0])
+                                print(message)
+                                # Tabloyu yenile
+                                dummy_books = db.get_all_books()
+                                scroll_y = 0
                                 break
+
+                # === SEARCH EVENT ===
+                if search_btn.handle_event(event):
+                    search_query = search_input.text.strip()
+                    if not search_query or search_query == "Kitap Adı, Yazar veya ISBN...":
+                        dummy_books = db.get_all_books()
+                    else:
+                        dummy_books = db.search_books(search_query)
+                    scroll_y = 0  # Tabloyu yenile
 
         # === ÇİZİM (RENDERING) ===
         screen.fill(config.WHITE)
@@ -150,7 +169,31 @@ def main():
             
         # === ANA EKRAN ÇİZİMİ ===
         elif current_state == config.STATE_USER:
-            # Sol Menü
+            # Sidebar arka planı
+            pygame.draw.rect(screen, config.DARK_GRAY, (0, 0, 220, config.HEIGHT))
+            
+            # Logo (varsa)
+            if logo is not None:
+                screen.blit(logo, (35, 10))
+                # Butonlar aşağı kaydırılmalı
+                btn_library.rect.y = 170
+                btn_profile.rect.y = 220
+                if logged_in_role in ["Personel", "Yönetici"]:
+                    btn_inventory.rect.y = 270
+                    btn_penalties.rect.y = 320
+                if logged_in_role == "Yönetici":
+                    btn_users.rect.y = 370
+            else:
+                # Logo yoksa butonlar normal konumda
+                btn_library.rect.y = 100
+                btn_profile.rect.y = 150
+                if logged_in_role in ["Personel", "Yönetici"]:
+                    btn_inventory.rect.y = 200
+                    btn_penalties.rect.y = 250
+                if logged_in_role == "Yönetici":
+                    btn_users.rect.y = 300
+
+            # Sol Menü Butonları
             btn_library.draw(screen)
             btn_profile.draw(screen)
             if logged_in_role in ["Personel", "Yönetici"]:
@@ -158,6 +201,9 @@ def main():
                 btn_penalties.draw(screen)
             if logged_in_role == "Yönetici":
                 btn_users.draw(screen)
+            
+            # Sağ Taraf Arka Planı (LIGHT_BLUE)
+            pygame.draw.rect(screen, config.LIGHT_BLUE, (220, 0, config.WIDTH - 220, config.HEIGHT))
             
             # Sağ Taraf Başlık
             title = title_font.render("Kitaplık", True, config.BLACK)
@@ -198,7 +244,7 @@ def main():
                     elif logged_in_role in ["Personel", "Yönetici"]:
                         # Personel ve Yönetici için başka işlemler olabilir
                         pass
-                    
+      	      		
             screen.set_clip(None)
             
         pygame.display.flip()

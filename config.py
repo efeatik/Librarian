@@ -17,3 +17,4 @@ GRAY = (200, 200, 200)
 DARK_GRAY = (50, 50, 50)
 BLUE = (0, 122, 255)
 HOVER_BLUE = (0, 100, 200) # Fare üzerine gelinceki renk
+LIGHT_BLUE = (235, 245, 255) # Yumuşak açık mavi tonu
