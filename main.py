@@ -3,6 +3,7 @@
 import pygame
 import config
 from ui_elements import Button, TextBox, RoleSelector
+from backend import LibrarySystem  # Backend'i içe aktar
 
 def main():
     pygame.init()
@@ -35,18 +36,14 @@ def main():
     search_btn = Button(660, 80, 100, 40, "Ara", font)
     logout_btn = Button(900, 20, 100, 40, "Çıkış", font)
     
-    # Özel örnek veri listesi
-    dummy_books = [
-        ["978-01", "İnsanlığımı Yitirirken", "Osamu Dazai", "3", "Müsait"],
-        ["978-02", "Yeraltından Notlar", "Dostoyevski", "5", "Müsait"],
-        ["978-03", "Budala", "Dostoyevski", "2", "Müsait"],
-        ["978-04", "Beyaz Geceler", "Dostoyevski", "0", "Ödünç Verildi"],
-        ["978-05", "Öteki", "Dostoyevski", "1", "Müsait"]
-    ]
-    # Kaydırma testi için ekstra kitaplar dolduruyoruz
-    for i in range(6, 25):
-        dummy_books.append([f"978-{i:02d}", f"Test Kitabı {i}", f"Yazar {i}", f"{i%4}", "Müsait"])
-
+    # --- BACKEND INITIALIZATION ---
+    # Backend sistemini başlat
+    db = LibrarySystem()
+    
+    # --- BOOK DATA INITIALIZATION ---
+    # Dummy veri yerine backend'ten kitapları al
+    dummy_books = db.get_all_books_as_list()
+    
     # Durum Yönetimi
     current_state = config.STATE_LOGIN
     logged_in_role = "" # Hangi rolde giriş yapıldığını tutar
@@ -80,10 +77,17 @@ def main():
                 pass_input.handle_event(event)
                 
                 if login_btn.handle_event(event):
-                    logged_in_role = role_selector.get_selected_role()
-                    print(f"{logged_in_role} yetkisiyle giriş yapıldı.")
-                    current_state = config.STATE_USER
-                    scroll_y = 0 # Sayfa değişiminde scroll'u sıfırla
+                    # Backend ile kimlik doğrulama
+                    username = user_input.text
+                    password = pass_input.text
+                    role = db.authenticate_user(username, password)
+                    if role:
+                        logged_in_role = role
+                        print(f"{logged_in_role} yetkisiyle giriş yapıldı.")
+                        current_state = config.STATE_USER
+                        scroll_y = 0 # Sayfa değişiminde scroll'u sıfırla
+                    else:
+                        print("Giriş başarısız: Kullanıcı adı veya şifre hatalı.")
             
             # === ANA EKRAN OLAYLARI ===
             elif current_state == config.STATE_USER:
@@ -122,91 +126,16 @@ def main():
                         
                         # Eğer stok 0'dan büyükse ve öğrenci yetkisiyle girildiyse
                         if stok_sayisi > 0 and logged_in_role == "Öğrenci":
-                            # Butonun sanal Y koordinatını anlık olarak güncelle (World -> Screen)
-                            btn.rect.y = 200 + (i * item_height) + scroll_y
-                            
-                            # Tıklama kontrolünü yap
-                            if btn.handle_event(event):
-                                print(f"[TALEP] {dummy_books[i][1]} kitabı için ödünç alma işlemi başlatıldı!")
-                                # İleride burada borrow_book(user_id, isbn) fonksiyonu çağrılacak
-
-        # SCROLL SINIRLARI
-        if scroll_y > 0: scroll_y = 0
-        max_scroll = max(0, (len(dummy_books) * item_height) - 500)
-        if scroll_y < -max_scroll: scroll_y = -max_scroll
-
-        # === ÇİZİM (RENDERING) ===
-        screen.fill(config.WHITE)
-
-        if current_state == config.STATE_LOGIN:
-            screen.blit(title_font.render("Librarian Sistemine Giriş", True, config.BLACK), (340, 150))
-            role_selector.draw(screen)
-            user_input.draw(screen)
-            pass_input.draw(screen)
-            login_btn.draw(screen)
-
-        elif current_state == config.STATE_USER:
-            # 1. SOL MENÜ (SIDEBAR) ÇİZİMİ
-            pygame.draw.rect(screen, config.DARK_GRAY, (0, 0, 220, config.HEIGHT))
-            
-            # Menü Başlığı
-            role_surf = font.render(f"Rol: {logged_in_role}", True, config.WHITE)
-            screen.blit(role_surf, (20, 30))
-            pygame.draw.line(screen, config.WHITE, (10, 60), (210, 60), 1)
-
-            # Rol Yetkilerine Göre Buton Çizimi (Conditional Rendering)
-            btn_library.draw(screen)
-            btn_profile.draw(screen)
-            
-            if logged_in_role in ["Personel", "Yönetici"]:
-                btn_inventory.draw(screen)
-                btn_penalties.draw(screen)
-            
-            if logged_in_role == "Yönetici":
-                btn_users.draw(screen)
-
-            # 2. SAĞ TARAF (İÇERİK) ÇİZİMİ
-            screen.blit(title_font.render("Kütüphane Envanteri", True, config.BLUE), (250, 30))
-            logout_btn.draw(screen)
-            search_input.draw(screen)
-            search_btn.draw(screen)
-            
-            # Tablo Başlıkları
-            # Başlıkları Çiz
-            for i, h in enumerate(headers):
-                header_surf = font.render(h, True, config.BLACK)
-                # Sütunları daha sıkı yerleştirmek için 130 px aralık
-                screen.blit(header_surf, (250 + i*120, 150))
-            
-            pygame.draw.line(screen, config.BLACK, (250, 180), (1000, 180), 2)
-            
-            # Scroll Edilebilir Liste Alanı Maskesi
-            clip_rect = pygame.Rect(250, 185, 750, 550)
-            screen.set_clip(clip_rect)
-            
-            for index, book in enumerate(dummy_books):
-                row_y = 200 + (index * item_height) + scroll_y
-                stok = int(book[3])
-                
-                # Kitap bilgilerini metin olarak bas
-                for i, val in enumerate(book):
-                    color = config.BLACK if stok == 0 else config.DARK_GRAY
-                    val_surf = font.render(val, True, color)
-                    screen.blit(val_surf, (250 + i*120, row_y + 5))
-                
-                # Stok kontrolü 
-                if stok > 0:
-                    if logged_in_role == "Öğrenci":
-                        # Butonun çizim pozisyonunu güncelle ve ekrana bas
-                        borrow_buttons[index].rect.y = row_y
-                        borrow_buttons[index].draw(screen)
-                    elif logged_in_role in ["Personel", "Yönetici"]:
-                        # Personel görüyorsa düzenle butonu olabilir, şimdilik boş
-                        pass 
-                else:
-                    # Stok bittiyse butonu gizle, kırmızı uyarı yazısı koy
-                    out_surf = sidebar_font.render("Stokta Yok", True, (200, 0, 0))
-                    screen.blit(out_surf, (850, row_y + 5))
+                            # Butonun çizim pozisyonunu güncelle ve ekrana bas
+                            borrow_buttons[index].rect.y = row_y
+                            borrow_buttons[index].draw(screen)
+                        elif logged_in_role in ["Personel", "Yönetici"]:
+                            # Personel görüyorsa düzenle butonu olabilir, şimdilik boş
+                            pass 
+                    else:
+                        # Stok bittiyse butonu gizle, kırmızı uyarı yazısı koy
+                        out_surf = sidebar_font.render("Stokta Yok", True, (200, 0, 0))
+                        screen.blit(out_surf, (850, row_y + 5))
                     
             screen.set_clip(None)
             
