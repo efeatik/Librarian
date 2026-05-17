@@ -19,17 +19,26 @@ def main():
     sidebar_font = pygame.font.SysFont("Arial", 18, bold=True)
     title_font = pygame.font.SysFont("Arial", 32, bold=True)
 
+    # --- LOGO YÜKLEME ---
+    logo_img = None
+    try:
+        raw_logo = pygame.image.load("logo.png")
+        logo_img = pygame.transform.scale(raw_logo, (120, 120))
+    except Exception as e:
+        print(f"Logo yüklenemedi: {e}")
+
     # --- UI ELEMANLARI ---
     role_selector = RoleSelector(340, 220, ["Öğrenci", "Personel", "Yönetici"], font)
     user_input = TextBox(340, 270, 350, 40, "Kullanıcı Adı", font=font)
     pass_input = TextBox(340, 330, 350, 40, "Şifre", is_password=True, font=font)
     login_btn = Button(340, 390, 350, 50, "Giriş Yap", font)
 
-    btn_library = Button(10, 100, 200, 40, "📚 Kitaplık", sidebar_font)
-    btn_profile = Button(10, 150, 200, 40, "👤 Profilim", sidebar_font)
-    btn_inventory = Button(10, 200, 200, 40, "➕ Envanter Yönetimi", sidebar_font)
-    btn_penalties = Button(10, 250, 200, 40, "⚠️ Geciken İadeler", sidebar_font)
-    btn_users = Button(10, 300, 200, 40, "👥 Kullanıcı İşlemleri", sidebar_font)
+    # Sol menü butonları logo ve kullanıcı bilgisine yer açmak için aşağı kaydırıldı
+    btn_library = Button(10, 230, 200, 40, "Kitaplık", sidebar_font)
+    btn_profile = Button(10, 280, 200, 40, "Profilim", sidebar_font)
+    btn_inventory = Button(10, 330, 200, 40, "Envanter Yönetimi", sidebar_font)
+    btn_penalties = Button(10, 380, 200, 40, "Geciken İadeler", sidebar_font)
+    btn_users = Button(10, 430, 200, 40, "Kullanıcı İşlemleri", sidebar_font)
 
     search_input = TextBox(250, 80, 400, 40, "Kitap Adı, Yazar veya ISBN...", font=font)
     search_btn = Button(660, 80, 100, 40, "Ara", font)
@@ -63,7 +72,7 @@ def main():
     create_user_btn = Button(340, 390, 350, 50, "Kullanıcı Oluştur", font)
     new_role_selector = None
 
-    # --- YENİ: ENVANTER YÖNETİMİ ELEMANLARI ---
+    # --- ENVANTER YÖNETİMİ ELEMANLARI ---
     book_isbn_input = TextBox(340, 150, 350, 40, "ISBN (Örn: 978-01)", font=font)
     book_title_input = TextBox(340, 210, 350, 40, "Kitap Adı", font=font)
     book_author_input = TextBox(340, 270, 350, 40, "Yazar", font=font)
@@ -116,7 +125,7 @@ def main():
                     overdue_loans = db.get_user_overdue_books(logged_in_username)
                     return_buttons = sync_return_buttons(active_loans, font)
 
-                # Yeni: Envanter Yönetimi Menüsü
+                # Envanter Yönetimi Menüsü
                 if logged_in_role in ["Personel", "Yönetici"] and btn_inventory.handle_event(event):
                     current_state = config.STATE_INVENTORY
                     ui_message = ""
@@ -177,7 +186,7 @@ def main():
                             return_buttons = sync_return_buttons(active_loans, font)
                             break
 
-            # ================= ENVANTER YÖNETİMİ (YENİ EKRAN) =================
+            # ================= ENVANTER YÖNETİMİ =================
             elif current_state == config.STATE_INVENTORY:
                 book_isbn_input.handle_event(event)
                 book_title_input.handle_event(event)
@@ -245,9 +254,19 @@ def main():
         elif current_state in [config.STATE_USER, config.STATE_PROFILE, config.STATE_INVENTORY, config.STATE_USER_MANAGEMENT]:
             # ORTAK SOL MENÜ
             pygame.draw.rect(screen, config.DARK_GRAY, (0, 0, 220, config.HEIGHT))
+            
+            # Logo Çizimi
+            if logo_img:
+                screen.blit(logo_img, (50, 20))
+            
+            # Kullanıcı ve Rol Çizimi
+            user_surf = font.render(f"Kullanıcı: {logged_in_username}", True, config.WHITE)
             role_surf = font.render(f"Rol: {logged_in_role}", True, config.WHITE)
-            screen.blit(role_surf, (20, 30))
-            pygame.draw.line(screen, config.WHITE, (10, 60), (210, 60), 1)
+            screen.blit(user_surf, (15, 150))
+            screen.blit(role_surf, (15, 180))
+            
+            # Ayırıcı Çizgi
+            pygame.draw.line(screen, config.WHITE, (10, 215), (210, 215), 1)
 
             btn_library.draw(screen)
             btn_profile.draw(screen)
@@ -290,9 +309,9 @@ def main():
                         color = config.BLACK if stok == 0 else config.DARK_GRAY
                         screen.blit(font.render(str(val), True, color), (250 + i*120, row_y + 5))
                     
-                    # 2. YENİ: 5. Sütun olan "Durum" bilgisini stok sayısına göre hesapla ve çiz
+                    # 2. Durum bilgisini stok sayısına göre hesapla ve çiz
                     durum_metni = "Müsait" if stok > 0 else "Tükendi"
-                    durum_renk = (0, 150, 0) if stok > 0 else (200, 0, 0) # Yeşil veya Kırmızı
+                    durum_renk = (0, 150, 0) if stok > 0 else (200, 0, 0)
                     screen.blit(font.render(durum_metni, True, durum_renk), (250 + 4*120, row_y + 5))
                     
                     # 3. İşlem sütunundaki Butonları çiz
@@ -347,7 +366,6 @@ def main():
 
                 screen.set_clip(None)
 
-            # === YENİ: ENVANTER YÖNETİMİ EKRANI ÇİZİMİ ===
             elif current_state == config.STATE_INVENTORY:
                 screen.blit(title_font.render("Yeni Kitap Ekle", True, config.BLUE), (250, 30))
                 back_btn.draw(screen)
