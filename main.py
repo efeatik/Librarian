@@ -130,9 +130,14 @@ def main():
                     current_state = config.STATE_INVENTORY
                     ui_message = ""
 
-                if logged_in_role == "Yönetici" and btn_users.handle_event(event): 
+                # Personel için de kullanıcı yönetimi menüsü açılacak, ancak sadece "Öğrenci" rolü oluşturabilecek
+                if logged_in_role in ["Yönetici", "Personel"] and btn_users.handle_event(event): 
                     current_state = config.STATE_USER_MANAGEMENT
-                    new_role_selector = RoleSelector(340, 220, ["Öğrenci", "Personel", "Yönetici"], font)
+                    if logged_in_role == "Yönetici":
+                        new_role_selector = RoleSelector(340, 220, ["Öğrenci", "Personel", "Yönetici"], font)
+                    else:
+                        # Personel sadece "Öğrenci" rolü oluşturabilir
+                        new_role_selector = RoleSelector(340, 220, ["Öğrenci"], font)
                     ui_message = ""
                 
                 mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -295,7 +300,7 @@ def main():
             if logged_in_role in ["Personel", "Yönetici"]:
                 btn_inventory.draw(screen)
                 btn_penalties.draw(screen)
-            if logged_in_role == "Yönetici":
+            if logged_in_role in ["Personel", "Yönetici"]:
                 btn_users.draw(screen)
 
             # Sağ Taraf Arka Planı

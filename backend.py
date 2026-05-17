@@ -180,9 +180,15 @@ class LibrarySystem:
 
     def create_user(self, admin_username, username, password, role):
         """Yeni kullanıcı oluşturur."""
-        # Sadece yönetici kullanıcılar yeni kullanıcı oluşturabilir
-        if self.users.get(admin_username, {}).get("role") != "Yönetici":
-            return False, "Yeterli yetki yok."
+       
+       # Artık personel sadece kullanıcı oluşturabilir, yönetici her türlü kullanıcı oluşturabilir
+        creator_role = self.users.get(admin_username, {}).get("role")
+        if creator_role == "Yönetici":
+            pass  # Yönetici her türlü kullanıcı oluşturabilir
+        elif creator_role == "Personel" and role == "Öğrenci":
+            pass  # Personel sadece kullanıcı oluşturabilir
+        else:
+            return False, "Yeterli yetki yok veya geçersiz rol."
         
         if username in self.users:
             return False, "Kullanıcı zaten mevcut."
