@@ -375,26 +375,37 @@ def main():
                 for index, loan in enumerate(active_loans):
                     row_y = 200 + (index * item_height) + scroll_y
                     isbn = loan["isbn"]
+                    status = loan.get("status", "Onaylandi") # Varsayılan durum "Onaylandi" olarak alındı
                     
                     book_info = db.get_book_by_isbn(isbn)
                     title = book_info["title"] if book_info else "Bilinmeyen Kitap"
                     if len(title) > 13: title = title[:10] + "..."
                     
-                    borrow_date = loan["borrow_date"][:10]
-                    due_date = loan["due_date"][:10]
-                    
-                    is_overdue = any(t for t in overdue_loans if t["isbn"] == isbn and not t["returned"])
-                    text_color = (200, 0, 0) if is_overdue else config.DARK_GRAY
+                    if status == "Bekliyor":
+                        borrow_date = "Onay Bekliyor"
+                        due_date = "-"
+                        text_color = (100, 100, 250) # Bekleyen talepler için mavi ton
+                    else:
+                        borrow_date = loan["borrow_date"][:10]
+                        due_date = loan["due_date"][:10]
 
+                        # Gecikmiş mi kontrol et
+                        is_overdue = any(t for t in overdue_loans if t["isbn"] == isbn and t.get("status") == "Onaylandı")
+                        text_color = (200, 0, 0) if is_overdue else config.DARK_GRAY
+
+                    # Ekrana çizimler
                     screen.blit(font.render(isbn, True, text_color), (250, row_y + 5))
                     screen.blit(font.render(title, True, text_color), (390, row_y + 5))
                     screen.blit(font.render(borrow_date, True, text_color), (530, row_y + 5))
                     screen.blit(font.render(due_date, True, text_color), (670, row_y + 5))
 
-                    return_buttons[index].rect.y = row_y
-                    return_buttons[index].draw(screen)
 
-                screen.set_clip(None)
+                    if status == "Onaylandı":
+                        return_buttons[index].rect.y = row_y
+                        return_buttons[index].draw(screen)
+                    else:
+                        screen.blit(sidebar_font.render("İşlemde", True, (150, 150, 150)), (800, row_y + 5))
+                
 
             elif current_state == config.STATE_INVENTORY:
                 screen.blit(title_font.render("Yeni Kitap Ekle", True, config.BLUE), (250, 30))
