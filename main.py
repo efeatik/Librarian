@@ -40,7 +40,7 @@ def main():
     search_input = TextBox(250, 80, 400, 40, "Kitap Adı, Yazar veya ISBN...", font=font)
     search_btn = Button(660, 80, 100, 40, "Ara", font)
     logout_btn = Button(900, 20, 100, 40, "Çıkış", font)
-    back_btn = Button(250, 20, 100, 40, "Geri", font)
+    back_btn = Button(900, 20, 100, 40, "Geri", font)
     
     # --- BACKEND BAŞLATMA ---
     db = LibrarySystem()
