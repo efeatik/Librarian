@@ -168,7 +168,7 @@ def main():
 
             # ================= PROFİL EKRANI =================
             elif current_state == config.STATE_PROFILE:
-                if back_btn.handle_event(event):
+                if back_btn.handle_event(event) or btn_library.handle_event(event):
                     current_state = config.STATE_USER
                     ui_message = ""
                     books_data = db.get_all_books()
@@ -198,7 +198,7 @@ def main():
                 book_author_input.handle_event(event)
                 book_stock_input.handle_event(event)
                 
-                if back_btn.handle_event(event):
+                if back_btn.handle_event(event) or btn_library.handle_event(event):
                     current_state = config.STATE_USER
                     ui_message = ""
                     books_data = db.get_all_books()
@@ -229,7 +229,7 @@ def main():
                 new_user_input.handle_event(event)
                 new_pass_input.handle_event(event)
                 
-                if back_btn.handle_event(event):
+                if back_btn.handle_event(event) or btn_library.handle_event(event):
                     current_state = config.STATE_USER
                     ui_message = ""
                 
