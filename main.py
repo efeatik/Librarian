@@ -1,82 +1,74 @@
 import pygame
 import config
 from ui_elements import Button, TextBox, RoleSelector
-from backend import LibrarySystem  # Backend'i içe aktar
+from backend import LibrarySystem
+
+def sync_borrow_buttons(books, font):
+    return [Button(850, 0, 100, 30, "Ödünç Al", font) for _ in range(len(books))]
+
+def sync_return_buttons(loans, font):
+    return [Button(800, 0, 100, 30, "İade Et", font) for _ in range(len(loans))]
 
 def main():
     pygame.init()
     screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT))
-    pygame.display.set_caption("Librarian")
+    pygame.display.set_caption("Librarian - Kütüphane Sistemi")
     clock = pygame.time.Clock()
     
     font = pygame.font.SysFont("Arial", 20)
     sidebar_font = pygame.font.SysFont("Arial", 18, bold=True)
     title_font = pygame.font.SysFont("Arial", 32, bold=True)
 
-    # --- GİRİŞ EKRANI ELEMANLARI ---
+    # --- UI ELEMANLARI ---
     role_selector = RoleSelector(340, 220, ["Öğrenci", "Personel", "Yönetici"], font)
     user_input = TextBox(340, 270, 350, 40, "Kullanıcı Adı", font=font)
     pass_input = TextBox(340, 330, 350, 40, "Şifre", is_password=True, font=font)
     login_btn = Button(340, 390, 350, 50, "Giriş Yap", font)
 
-    # --- ANA EKRAN / SOL MENÜ ELEMANLARI ---
-    # Ortak butonlar
     btn_library = Button(10, 100, 200, 40, "📚 Kitaplık", sidebar_font)
     btn_profile = Button(10, 150, 200, 40, "👤 Profilim", sidebar_font)
-    # Personel ve Admin butonları
     btn_inventory = Button(10, 200, 200, 40, "➕ Envanter Yönetimi", sidebar_font)
     btn_penalties = Button(10, 250, 200, 40, "⚠️ Geciken İadeler", sidebar_font)
-    # Sadece Admin butonu
     btn_users = Button(10, 300, 200, 40, "👥 Kullanıcı İşlemleri", sidebar_font)
 
-    # Sağ taraf (İçerik) Elemanları - X koordinatları 250'ye kaydırıldı
     search_input = TextBox(250, 80, 400, 40, "Kitap Adı, Yazar veya ISBN...", font=font)
     search_btn = Button(660, 80, 100, 40, "Ara", font)
     logout_btn = Button(900, 20, 100, 40, "Çıkış", font)
+    back_btn = Button(250, 20, 100, 40, "Geri", font)
     
-    # --- BACKEND INITIALIZATION ---
-    # Backend sistemini başlat
+    # --- BACKEND BAŞLATMA ---
     db = LibrarySystem()
+    books_data = db.get_all_books()
+    borrow_buttons = sync_borrow_buttons(books_data, font)
     
-    # --- BOOK DATA INITIALIZATION ---
-    # Dummy veri yerine backend'ten kitapları al
-    dummy_books = db.get_all_books()
-    
-    # Durum Yönetimi
+    # --- DURUM VE VERİ DEĞİŞKENLERİ ---
     current_state = config.STATE_LOGIN
-    logged_in_role = "" # Hangi rolde giriş yapıldığını tutar
+    logged_in_role = ""
+    logged_in_username = ""
+    ui_message = ""
     running = True
 
-    # Scroll Değişkenleri
     scroll_y = 0
     scroll_speed = 25
     item_height = 40 
 
-    # Tablo Başlıkları (İşlem sütunu eklendi)
-    headers = ["ISBN", "Kitap Adı", "Yazar", "Stok", "Durum", "İşlem"]
-    
-    # Her kitap için bir Ödünç Al butonu oluşturuyoruz
-    borrow_buttons = []
-    for i in range(len(dummy_books)):
-        # X koordinatı 850, Y koordinatı geçici olarak 0 veriliyor (Scroll'da güncellenecek)
-        btn = Button(850, 0, 100, 30, "Ödünç Al", font)
-        borrow_buttons.append(btn)
+    # Profil Ekranı
+    active_loans = []
+    overdue_loans = []
+    return_buttons = []
 
-    # === LOGO INTEGRATION ===
-    logo = None
-    try:
-        logo = pygame.image.load("logo.png")
-        logo = pygame.transform.scale(logo, (150, 150))
-    except pygame.error:
-        pass  # Logo bulunamazsa None kalır
-
-    # === USER MANAGEMENT UI ELEMENTS ===
+    # Kullanıcı Yönetimi
     new_user_input = TextBox(340, 270, 350, 40, "Yeni Kullanıcı Adı", font=font)
     new_pass_input = TextBox(340, 330, 350, 40, "Yeni Şifre", font=font)
     create_user_btn = Button(340, 390, 350, 50, "Kullanıcı Oluştur", font)
-    back_btn = Button(250, 20, 100, 40, "Geri", font)
     new_role_selector = None
-    ui_message = ""
+
+    # --- YENİ: ENVANTER YÖNETİMİ ELEMANLARI ---
+    book_isbn_input = TextBox(340, 150, 350, 40, "ISBN (Örn: 978-01)", font=font)
+    book_title_input = TextBox(340, 210, 350, 40, "Kitap Adı", font=font)
+    book_author_input = TextBox(340, 270, 350, 40, "Yazar", font=font)
+    book_stock_input = TextBox(340, 330, 350, 40, "Stok Adedi (Sayı)", font=font)
+    add_book_btn = Button(340, 390, 350, 50, "Sisteme Ekle", font)
 
     while running:
         events = pygame.event.get()
@@ -84,175 +76,306 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             
-            # === GİRİŞ EKRANI OLAYLARI ===
+            # ================= GİRİŞ EKRANI =================
             if current_state == config.STATE_LOGIN:
                 role_selector.handle_event(event)
                 user_input.handle_event(event)
                 pass_input.handle_event(event)
                 
                 if login_btn.handle_event(event):
-                    # Backend ile kimlik doğrulama
                     username = user_input.text
                     password = pass_input.text
                     role = db.authenticate_user(username, password)
+                    
                     if role:
                         logged_in_role = role
-                        print(f"{logged_in_role} yetkisiyle giriş yapıldı.")
+                        logged_in_username = username
                         current_state = config.STATE_USER
-                        scroll_y = 0 # Sayfa değişiminde scroll'u sıfırla
+                        scroll_y = 0
+                        ui_message = ""
                     else:
-                        print("Giriş başarısız: Kullanıcı adı veya şifre hatalı.")
-            
-            # === ANA EKRAN OLAYLARI ===
+                        print("Hatalı Giriş")
+
+            # ================= ANA EKRAN (KİTAPLIK) =================
             elif current_state == config.STATE_USER:
                 search_input.handle_event(event)
                 
-                # Çıkış İşlemi
                 if logout_btn.handle_event(event):
                     current_state = config.STATE_LOGIN
                     logged_in_role = ""
+                    logged_in_username = ""
                     user_input.text = ""
                     pass_input.text = ""
+                    ui_message = ""
 
-                # Sol Menü Buton Dinlemeleri (Role Göre Koşullu)
-                if btn_library.handle_event(event): print("Kitaplık Sekmesi")
-                if btn_profile.handle_event(event): print("Profil Sekmesi")
+                if btn_profile.handle_event(event):
+                    current_state = config.STATE_PROFILE
+                    scroll_y = 0
+                    ui_message = ""
+                    active_loans = db.get_user_active_loans(logged_in_username)
+                    overdue_loans = db.get_user_overdue_books(logged_in_username)
+                    return_buttons = sync_return_buttons(active_loans, font)
+
+                # Yeni: Envanter Yönetimi Menüsü
+                if logged_in_role in ["Personel", "Yönetici"] and btn_inventory.handle_event(event):
+                    current_state = config.STATE_INVENTORY
+                    ui_message = ""
+
+                if logged_in_role == "Yönetici" and btn_users.handle_event(event): 
+                    current_state = config.STATE_USER_MANAGEMENT
+                    new_role_selector = RoleSelector(340, 220, ["Öğrenci", "Personel", "Yönetici"], font)
+                    ui_message = ""
                 
-                if logged_in_role in ["Personel", "Yönetici"]:
-                    if btn_inventory.handle_event(event): print("Envanter Yönetimi Sekmesi")
-                    if btn_penalties.handle_event(event): print("Cezalar Sekmesi")
-                
-                if logged_in_role == "Yönetici":
-                    if btn_users.handle_event(event): 
-                        current_state = config.STATE_USER_MANAGEMENT
-                        # Rol seçiciyi başlat
-                        if logged_in_role == "Yönetici":
-                            new_role_selector = RoleSelector(340, 220, ["Öğrenci", "Personel", "Yönetici"], font)
-                        else:
-                            new_role_selector = RoleSelector(340, 220, ["Öğrenci"], font)
-                        ui_message = ""
-                
-                # Scroll İşlemi (Sadece farenin x pozisyonu tablonun üzerindeyse çalışsın)
-                mouse_x, _ = pygame.mouse.get_pos()
+                mouse_x, mouse_y = pygame.mouse.get_pos()
                 if event.type == pygame.MOUSEWHEEL and mouse_x > 220:
                     scroll_y += event.y * scroll_speed
                 
-                # Buton tıklamalarını dinle (Sadece tablo alanındaysa)
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    mouse_x, mouse_y = pygame.mouse.get_pos()
-                    clip_rect = pygame.Rect(250, 185, 750, 550)
-                    if clip_rect.collidepoint(mouse_x, mouse_y):
-                        for i, btn in enumerate(borrow_buttons):
-                            # Butonun konumunu hesapla ve tıklama kontrolü yap
-                            row_y = 185 + (i * item_height) - scroll_y
-                            btn.rect.y = row_y
-                            if btn.rect.collidepoint(mouse_x, mouse_y):
-                                # Ödünç alma işlemi
-                                success, message = db.borrow_book(logged_in_role, dummy_books[i][0])
-                                print(message)
-                                # Tabloyu yenile
-                                dummy_books = db.get_all_books()
-                                scroll_y = 0
+                clip_rect = pygame.Rect(250, 185, 750, 550)
+                if event.type == pygame.MOUSEBUTTONDOWN and clip_rect.collidepoint(mouse_x, mouse_y):
+                    for i, btn in enumerate(borrow_buttons):
+                        stok_sayisi = int(books_data[i][3])
+                        if stok_sayisi > 0 and logged_in_role == "Öğrenci":
+                            btn.rect.y = 200 + (i * item_height) + scroll_y
+                            if btn.handle_event(event):
+                                success, msg = db.borrow_book(logged_in_username, books_data[i][0])
+                                ui_message = msg
+                                books_data = db.get_all_books()
+                                borrow_buttons = sync_borrow_buttons(books_data, font)
                                 break
 
-                # === SEARCH EVENT ===
                 if search_btn.handle_event(event):
                     search_query = search_input.text.strip()
                     if not search_query or search_query == "Kitap Adı, Yazar veya ISBN...":
-                        dummy_books = db.get_all_books()
+                        books_data = db.get_all_books()
                     else:
-                        dummy_books = db.search_books(search_query)
-                    scroll_y = 0  # Tabloyu yenile
+                        books_data = db.search_books(search_query)
+                    borrow_buttons = sync_borrow_buttons(books_data, font)
+                    scroll_y = 0
 
-            # === USER MANAGEMENT OLAYLARI ===
+            # ================= PROFİL EKRANI =================
+            elif current_state == config.STATE_PROFILE:
+                if back_btn.handle_event(event):
+                    current_state = config.STATE_USER
+                    ui_message = ""
+                    books_data = db.get_all_books()
+                    borrow_buttons = sync_borrow_buttons(books_data, font)
+
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                if event.type == pygame.MOUSEWHEEL and mouse_x > 220:
+                    scroll_y += event.y * scroll_speed
+
+                clip_rect = pygame.Rect(250, 185, 750, 550)
+                if event.type == pygame.MOUSEBUTTONDOWN and clip_rect.collidepoint(mouse_x, mouse_y):
+                    for i, btn in enumerate(return_buttons):
+                        btn.rect.y = 200 + (i * item_height) + scroll_y
+                        if btn.handle_event(event):
+                            isbn = active_loans[i]["isbn"]
+                            success, msg = db.return_book(logged_in_username, isbn)
+                            ui_message = msg
+                            active_loans = db.get_user_active_loans(logged_in_username)
+                            overdue_loans = db.get_user_overdue_books(logged_in_username)
+                            return_buttons = sync_return_buttons(active_loans, font)
+                            break
+
+            # ================= ENVANTER YÖNETİMİ (YENİ EKRAN) =================
+            elif current_state == config.STATE_INVENTORY:
+                book_isbn_input.handle_event(event)
+                book_title_input.handle_event(event)
+                book_author_input.handle_event(event)
+                book_stock_input.handle_event(event)
+                
+                if back_btn.handle_event(event):
+                    current_state = config.STATE_USER
+                    ui_message = ""
+                    books_data = db.get_all_books()
+                    borrow_buttons = sync_borrow_buttons(books_data, font)
+                    
+                if add_book_btn.handle_event(event):
+                    isbn = book_isbn_input.text.strip()
+                    title = book_title_input.text.strip()
+                    author = book_author_input.text.strip()
+                    stock_str = book_stock_input.text.strip()
+                    
+                    if not isbn or not title or not author or not stock_str:
+                        ui_message = "Lütfen tüm alanları doldurun!"
+                    elif not stock_str.isdigit():
+                        ui_message = "Stok adedi sadece rakamlardan oluşmalıdır!"
+                    else:
+                        stock = int(stock_str)
+                        db.add_book(isbn, title, author, stock)
+                        ui_message = f"'{title}' sisteme eklendi!"
+                        book_isbn_input.text = ""
+                        book_title_input.text = ""
+                        book_author_input.text = ""
+                        book_stock_input.text = ""
+
+            # ================= KULLANICI YÖNETİMİ =================
             elif current_state == config.STATE_USER_MANAGEMENT:
-                if new_role_selector:
-                    new_role_selector.handle_event(event)
+                if new_role_selector: new_role_selector.handle_event(event)
                 new_user_input.handle_event(event)
                 new_pass_input.handle_event(event)
                 
                 if back_btn.handle_event(event):
                     current_state = config.STATE_USER
-                    new_role_selector = None
                     ui_message = ""
                 
                 if create_user_btn.handle_event(event):
-                    # Kullanıcı oluştur
                     new_username = new_user_input.text
                     new_password = new_pass_input.text
-                    new_role = "Öğrenci"  # Varsayılan rol
-                    if new_role_selector:
-                        selected_role = new_role_selector.get_selected_role()  # FIXED: Changed from get_selected() to get_selected_role()
-                        if selected_role:
-                            new_role = selected_role
-                    success, message = db.create_user(logged_in_role, new_username, new_password, new_role)
-                    ui_message = message
-                    new_user_input.clear()
-                    new_pass_input.clear()
+                    new_role = new_role_selector.get_selected_role() if new_role_selector else "Öğrenci"
+                    
+                    if not new_username or not new_password:
+                        ui_message = "Kullanıcı adı ve şifre boş bırakılamaz!"
+                    else:
+                        success, message = db.create_user(logged_in_username, new_username, new_password, new_role)
+                        ui_message = message
+                        new_user_input.text = ""
+                        new_pass_input.text = ""
 
-        # === ÇİZİM ===
-        screen.fill((255, 255, 255))  # Arka planı beyaz yap
+        # === ÇİZİM (RENDERING) KISMI ===
+        screen.fill(config.WHITE)
 
         if current_state == config.STATE_LOGIN:
-            # Giriş ekranı çizimi
-            screen.fill((255, 255, 255))  # Arka planı beyaz yap
-            
-            # Başlık çizimi
-            title_text = title_font.render("Kütüphane Sistemi", True, (0, 0, 0))
-            screen.blit(title_text, (350, 100))
-            
-            # Giriş formu çizimi
+            screen.blit(title_font.render("Librarian Sistemine Giriş", True, config.BLACK), (340, 100))
             role_selector.draw(screen)
             user_input.draw(screen)
             pass_input.draw(screen)
             login_btn.draw(screen)
             
-        elif current_state == config.STATE_USER:
-            # Sidebar çizimi
-            pygame.draw.rect(screen, (50, 50, 50), (0, 0, 220, 600))  # Sidebar
-            
-            # İçerik alanı çizimi
-            pygame.draw.rect(screen, (200, 200, 200), (220, 0, 780, 600))  # İçerik alanı
-            
-            # Menü butonları çizimi
+        elif current_state in [config.STATE_USER, config.STATE_PROFILE, config.STATE_INVENTORY, config.STATE_USER_MANAGEMENT]:
+            # ORTAK SOL MENÜ
+            pygame.draw.rect(screen, config.DARK_GRAY, (0, 0, 220, config.HEIGHT))
+            role_surf = font.render(f"Rol: {logged_in_role}", True, config.WHITE)
+            screen.blit(role_surf, (20, 30))
+            pygame.draw.line(screen, config.WHITE, (10, 60), (210, 60), 1)
+
             btn_library.draw(screen)
             btn_profile.draw(screen)
-            btn_inventory.draw(screen)
-            btn_penalties.draw(screen)
-            btn_users.draw(screen)
-            
-            # Arama alanı çizimi
-            search_input.draw(screen)
-            search_btn.draw(screen)
-            logout_btn.draw(screen)
-            
-            # Kitap listesi çizimi
-            # (Bu kısmı kısalttık ama gerçek uygulamada daha fazla çizim olur)
-            
-        elif current_state == config.STATE_USER_MANAGEMENT:
-            # Sidebar çizimi
-            pygame.draw.rect(screen, (50, 50, 50), (0, 0, 220, 600))  # Sidebar
-            
-            # İçerik alanı çizimi
-            pygame.draw.rect(screen, (200, 200, 200), (220, 0, 780, 600))  # İçerik alanı
-            
-            # Geri butonu
-            back_btn.draw(screen)
-            
-            # Kullanıcı oluşturma formu
-            if new_role_selector:
-                new_role_selector.draw(screen)
-            new_user_input.draw(screen)
-            new_pass_input.draw(screen)
-            create_user_btn.draw(screen)
-            
-            # Mesajı çiz
-            if ui_message:
-                message_text = font.render(ui_message, True, (0, 0, 0))
-                screen.blit(message_text, (340, 450))
+            if logged_in_role in ["Personel", "Yönetici"]:
+                btn_inventory.draw(screen)
+                btn_penalties.draw(screen)
+            if logged_in_role == "Yönetici":
+                btn_users.draw(screen)
+
+            # EKRANA ÖZEL ÇİZİMLER
+            if current_state == config.STATE_USER:
+                screen.blit(title_font.render("Kütüphane Envanteri", True, config.BLUE), (250, 30))
+                logout_btn.draw(screen)
+                search_input.draw(screen)
+                search_btn.draw(screen)
+                
+                if ui_message:
+                    msg_color = (0, 150, 0) if "başarı" in ui_message.lower() else (200, 0, 0)
+                    screen.blit(font.render(ui_message, True, msg_color), (250, 130))
+
+                headers = ["ISBN", "Kitap Adı", "Yazar", "Stok", "Durum", "İşlem"]
+                for i, h in enumerate(headers):
+                    screen.blit(font.render(h, True, config.BLACK), (250 + i*120, 160))
+                pygame.draw.line(screen, config.BLACK, (250, 185), (1000, 185), 2)
+                
+                clip_rect = pygame.Rect(250, 190, 750, 550)
+                screen.set_clip(clip_rect)
+                
+                if scroll_y > 0: scroll_y = 0
+                max_scroll = max(0, (len(books_data) * item_height) - 500)
+                if scroll_y < -max_scroll: scroll_y = -max_scroll
+
+                for index, book in enumerate(books_data):
+                    row_y = 200 + (index * item_height) + scroll_y
+                    stok = int(book[3])
+                    
+                    # 1. Mevcut 4 veriyi (ISBN, Ad, Yazar, Stok) çiz
+                    for i, val in enumerate(book):
+                        if i == 1 and len(val) > 13: val = val[:10] + "..."
+                        color = config.BLACK if stok == 0 else config.DARK_GRAY
+                        screen.blit(font.render(str(val), True, color), (250 + i*120, row_y + 5))
+                    
+                    # 2. YENİ: 5. Sütun olan "Durum" bilgisini stok sayısına göre hesapla ve çiz
+                    durum_metni = "Müsait" if stok > 0 else "Tükendi"
+                    durum_renk = (0, 150, 0) if stok > 0 else (200, 0, 0) # Yeşil veya Kırmızı
+                    screen.blit(font.render(durum_metni, True, durum_renk), (250 + 4*120, row_y + 5))
+                    
+                    # 3. İşlem sütunundaki Butonları çiz
+                    if stok > 0 and logged_in_role == "Öğrenci":
+                        borrow_buttons[index].rect.y = row_y
+                        borrow_buttons[index].draw(screen)
+                    elif stok <= 0:
+                        screen.blit(sidebar_font.render("Stokta Yok", True, (200, 0, 0)), (850, row_y + 5))
+                screen.set_clip(None)
+
+            elif current_state == config.STATE_PROFILE:
+                screen.blit(title_font.render(f"Profilim - {logged_in_username}", True, config.BLUE), (250, 30))
+                back_btn.draw(screen)
+                
+                if ui_message:
+                    msg_color = (0, 150, 0) if "başarı" in ui_message.lower() else (200, 0, 0)
+                    screen.blit(font.render(ui_message, True, msg_color), (370, 30))
+
+                prof_headers = ["ISBN", "Kitap Adı", "Ödünç Tarihi", "İade Tarihi", "İşlem"]
+                for i, h in enumerate(prof_headers):
+                    screen.blit(font.render(h, True, config.BLACK), (250 + i*140, 150))
+                pygame.draw.line(screen, config.BLACK, (250, 180), (1000, 180), 2)
+
+                clip_rect = pygame.Rect(250, 185, 750, 550)
+                screen.set_clip(clip_rect)
+
+                if scroll_y > 0: scroll_y = 0
+                max_scroll = max(0, (len(active_loans) * item_height) - 500)
+                if scroll_y < -max_scroll: scroll_y = -max_scroll
+
+                for index, loan in enumerate(active_loans):
+                    row_y = 200 + (index * item_height) + scroll_y
+                    isbn = loan["isbn"]
+                    
+                    book_info = db.get_book_by_isbn(isbn)
+                    title = book_info["title"] if book_info else "Bilinmeyen Kitap"
+                    if len(title) > 13: title = title[:10] + "..."
+                    
+                    borrow_date = loan["borrow_date"][:10]
+                    due_date = loan["due_date"][:10]
+                    
+                    is_overdue = any(t for t in overdue_loans if t["isbn"] == isbn and not t["returned"])
+                    text_color = (200, 0, 0) if is_overdue else config.DARK_GRAY
+
+                    screen.blit(font.render(isbn, True, text_color), (250, row_y + 5))
+                    screen.blit(font.render(title, True, text_color), (390, row_y + 5))
+                    screen.blit(font.render(borrow_date, True, text_color), (530, row_y + 5))
+                    screen.blit(font.render(due_date, True, text_color), (670, row_y + 5))
+
+                    return_buttons[index].rect.y = row_y
+                    return_buttons[index].draw(screen)
+
+                screen.set_clip(None)
+
+            # === YENİ: ENVANTER YÖNETİMİ EKRANI ÇİZİMİ ===
+            elif current_state == config.STATE_INVENTORY:
+                screen.blit(title_font.render("Yeni Kitap Ekle", True, config.BLUE), (250, 30))
+                back_btn.draw(screen)
+                
+                book_isbn_input.draw(screen)
+                book_title_input.draw(screen)
+                book_author_input.draw(screen)
+                book_stock_input.draw(screen)
+                add_book_btn.draw(screen)
+                
+                if ui_message:
+                    msg_color = (0, 150, 0) if "eklendi" in ui_message.lower() else (200, 0, 0)
+                    screen.blit(font.render(ui_message, True, msg_color), (340, 460))
+
+            elif current_state == config.STATE_USER_MANAGEMENT:
+                screen.blit(title_font.render("Kullanıcı Yönetimi", True, config.BLUE), (250, 30))
+                back_btn.draw(screen)
+                if new_role_selector: new_role_selector.draw(screen)
+                new_user_input.draw(screen)
+                new_pass_input.draw(screen)
+                create_user_btn.draw(screen)
+                
+                if ui_message:
+                    msg_color = (0, 150, 0) if "başarı" in ui_message.lower() else (200, 0, 0)
+                    screen.blit(font.render(ui_message, True, msg_color), (340, 460))
         
         pygame.display.flip()
-        clock.tick(60)
+        clock.tick(config.FPS)
 
     pygame.quit()
 

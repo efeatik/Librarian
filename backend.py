@@ -1,5 +1,6 @@
 import json
 import os
+import hashlib
 from datetime import datetime, timedelta
 
 class LibrarySystem:
@@ -42,8 +43,8 @@ class LibrarySystem:
             self.save_transactions()
 
     def _hash_password(self, password):
-        # Basit şifreleme (gerçek uygulamada bcrypt gibi güçlü bir yöntem kullanılmalı)
-        return hash(password)  # Gerçek uygulamada hashlib kullanılmalı
+        # Güvenli SHA-256 şifrelemesi
+        return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
     def save_books(self):
         with open("kitaplar.json", "w") as f:
