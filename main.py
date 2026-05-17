@@ -28,22 +28,23 @@ def main():
         print(f"Logo yüklenemedi: {e}")
 
     # --- UI ELEMANLARI ---
-    role_selector = RoleSelector(340, 220, ["Öğrenci", "Personel", "Yönetici"], font)
-    user_input = TextBox(340, 270, 350, 40, "Kullanıcı Adı", font=font)
-    pass_input = TextBox(340, 330, 350, 40, "Şifre", is_password=True, font=font)
-    login_btn = Button(340, 390, 350, 50, "Giriş Yap", font)
+    # Giriş ekranı için RoleSelector KALDIRILDI! Artık rol otomatik bulunuyor.
+    user_input = TextBox(337, 340, 350, 45, "Kullanıcı Adı", font=font)
+    pass_input = TextBox(337, 400, 350, 45, "Şifre", is_password=True, font=font)
+    login_btn = Button(337, 470, 350, 50, "Giriş Yap", font)
 
-    # Sol menü butonları logo ve kullanıcı bilgisine yer açmak için aşağı kaydırıldı
+    # Sol menü butonları
     btn_library = Button(10, 230, 200, 40, "Kitaplık", sidebar_font)
     btn_profile = Button(10, 280, 200, 40, "Profilim", sidebar_font)
     btn_inventory = Button(10, 330, 200, 40, "Envanter Yönetimi", sidebar_font)
     btn_penalties = Button(10, 380, 200, 40, "Geciken İadeler", sidebar_font)
     btn_users = Button(10, 430, 200, 40, "Kullanıcı İşlemleri", sidebar_font)
 
+    # Sağ üst bileşenler (Geri butonu sağ üste sabitlendi)
     search_input = TextBox(250, 80, 400, 40, "Kitap Adı, Yazar veya ISBN...", font=font)
     search_btn = Button(660, 80, 100, 40, "Ara", font)
-    logout_btn = Button(900, 20, 100, 40, "Çıkış", font)
-    back_btn = Button(250, 20, 100, 40, "Geri", font)
+    logout_btn = Button(880, 20, 100, 40, "Çıkış", font)
+    back_btn = Button(880, 20, 100, 40, "Geri", font) # KOORDİNATLAR GÜNCELLENDİ
     
     # --- BACKEND BAŞLATMA ---
     db = LibrarySystem()
@@ -87,7 +88,6 @@ def main():
             
             # ================= GİRİŞ EKRANI =================
             if current_state == config.STATE_LOGIN:
-                role_selector.handle_event(event)
                 user_input.handle_event(event)
                 pass_input.handle_event(event)
                 
@@ -103,7 +103,7 @@ def main():
                         scroll_y = 0
                         ui_message = ""
                     else:
-                        print("Hatalı Giriş")
+                        ui_message = "Hatalı kullanıcı adı veya şifre!"
 
             # ================= ANA EKRAN (KİTAPLIK) =================
             elif current_state == config.STATE_USER:
@@ -245,11 +245,33 @@ def main():
         screen.fill(config.WHITE)
 
         if current_state == config.STATE_LOGIN:
-            screen.blit(title_font.render("Librarian Sistemine Giriş", True, config.BLACK), (340, 100))
-            role_selector.draw(screen)
+            # Modern Koyu Arka Plan
+            screen.fill((30, 45, 65))
+            
+            # Kart Gölgesi
+            pygame.draw.rect(screen, (20, 30, 45), (305, 139, 424, 450), border_radius=15)
+            # Kart (Card) Tasarımı
+            pygame.draw.rect(screen, config.WHITE, (300, 134, 424, 450), border_radius=15)
+            
+            # Logo Ortalama
+            if logo_img:
+                logo_rect = logo_img.get_rect(center=(512, 210))
+                screen.blit(logo_img, logo_rect)
+                
+            # Modernleştirilmiş Başlık
+            title_surf = title_font.render("Librarian Sistemine Giriş", True, config.BLACK)
+            title_rect = title_surf.get_rect(center=(512, 290))
+            screen.blit(title_surf, title_rect)
+            
             user_input.draw(screen)
             pass_input.draw(screen)
             login_btn.draw(screen)
+            
+            # Hata veya Bilgi Mesajı
+            if ui_message:
+                err_surf = font.render(ui_message, True, (200, 0, 0))
+                err_rect = err_surf.get_rect(center=(512, 550))
+                screen.blit(err_surf, err_rect)
             
         elif current_state in [config.STATE_USER, config.STATE_PROFILE, config.STATE_INVENTORY, config.STATE_USER_MANAGEMENT]:
             # ORTAK SOL MENÜ
@@ -275,6 +297,9 @@ def main():
                 btn_penalties.draw(screen)
             if logged_in_role == "Yönetici":
                 btn_users.draw(screen)
+
+            # Sağ Taraf Arka Planı
+            pygame.draw.rect(screen, config.LIGHT_BLUE, (220, 0, config.WIDTH - 220, config.HEIGHT))
 
             # EKRANA ÖZEL ÇİZİMLER
             if current_state == config.STATE_USER:
