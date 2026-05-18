@@ -235,3 +235,14 @@ class LibrarySystem:
                 if current_time > due_date:
                     overdue.append(transaction)
         return overdue
+    
+    def get_all_overdue_books(self):
+        overdue_list = []
+        from datetime import datetime
+        current_time = datetime.now()
+        for t in self.transactions:
+            if not t.get("returned", False): # Kitap henüz iade edilmemişse
+                due_date = datetime.fromisoformat(t["due_date"])
+                if current_time > due_date:
+                    overdue_list.append(t)
+        return overdue_list

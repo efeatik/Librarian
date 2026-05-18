@@ -57,6 +57,7 @@ def main():
     logged_in_username = ""
     ui_message = ""
     running = True
+    all_overdue_books = []
 
     scroll_y = 0
     scroll_speed = 25
@@ -246,6 +247,20 @@ def main():
                         new_user_input.text = ""
                         new_pass_input.text = ""
 
+            # ================= GECİKEN İADELER =================
+            elif current_state == config.STATE_PENALTIES:
+                # Geri veya Kitaplık tuşuna basıldığında ana menüye dön
+                if back_btn.handle_event(event) or btn_library.handle_event(event):
+                    current_state = config.STATE_USER
+                    ui_message = ""
+                    books_data = db.get_all_books()
+                    borrow_buttons = sync_borrow_buttons(books_data, font)
+                
+                # Farenin tekerleğiyle sayfayı aşağı/yukarı kaydırma
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                if event.type == pygame.MOUSEWHEEL and mouse_x > 220:
+                    scroll_y += event.y * scroll_speed
+                    
         # === ÇİZİM (RENDERING) KISMI ===
         screen.fill(config.WHITE)
 
@@ -278,7 +293,7 @@ def main():
                 err_rect = err_surf.get_rect(center=(512, 550))
                 screen.blit(err_surf, err_rect)
             
-        elif current_state in [config.STATE_USER, config.STATE_PROFILE, config.STATE_INVENTORY, config.STATE_USER_MANAGEMENT]:
+        elif current_state in [config.STATE_USER, config.STATE_PROFILE, config.STATE_INVENTORY, config.STATE_USER_MANAGEMENT, config.STATE_PENALTIES]:
             # ORTAK SOL MENÜ
             pygame.draw.rect(screen, config.DARK_GRAY, (0, 0, 220, config.HEIGHT))
             
@@ -300,6 +315,11 @@ def main():
             if logged_in_role in ["Personel", "Yönetici"]:
                 btn_inventory.draw(screen)
                 btn_penalties.draw(screen)
+                if btn_penalties.handle_event(event):
+                        current_state = config.STATE_PENALTIES
+                        ui_message = ""
+                        scroll_y = 0
+                        all_overdue_books = db.get_all_overdue_books()
             if logged_in_role in ["Personel", "Yönetici"]:
                 btn_users.draw(screen)
 
@@ -350,6 +370,49 @@ def main():
                         borrow_buttons[index].draw(screen)
                     elif stok <= 0:
                         screen.blit(sidebar_font.render("Stokta Yok", True, (200, 0, 0)), (850, row_y + 5))
+                screen.set_clip(None)
+
+            elif current_state == config.STATE_PENALTIES:
+                screen.blit(title_font.render("Geciken İadeler ve Cezalar", True, config.BLUE), (250, 30))
+                back_btn.draw(screen)
+
+                headers = ["Kullanıcı", "ISBN", "Kitap Adı", "İade Tarihi", "Gecikme (Gün)"]
+                for i, h in enumerate(headers):
+                    screen.blit(font.render(h, True, config.BLACK), (250 + i*140, 150))
+                pygame.draw.line(screen, config.BLACK, (250, 180), (1000, 180), 2)
+
+                clip_rect = pygame.Rect(250, 185, 750, 550)
+                screen.set_clip(clip_rect)
+
+                if scroll_y > 0: scroll_y = 0
+                max_scroll = max(0, (len(all_overdue_books) * item_height) - 500)
+                if scroll_y < -max_scroll: scroll_y = -max_scroll
+
+                from datetime import datetime
+                current_time = datetime.now()
+
+                for index, loan in enumerate(all_overdue_books):
+                    row_y = 200 + (index * item_height) + scroll_y
+
+                    username = loan["username"]
+                    isbn = loan["isbn"]
+                    due_date_str = loan["due_date"][:10]
+
+                    book_info = db.get_book_by_isbn(isbn)
+                    title = book_info["title"] if book_info else "Bilinmeyen"
+                    if len(title) > 13: title = title[:10] + "..."
+
+                    # Gecikme gününü hesapla
+                    due_date_obj = datetime.fromisoformat(loan["due_date"])
+                    gecikme_gun = (current_time - due_date_obj).days
+
+                    # Ekrana Yazdır
+                    screen.blit(font.render(username, True, config.DARK_GRAY), (250, row_y + 5))
+                    screen.blit(font.render(isbn, True, config.DARK_GRAY), (390, row_y + 5))
+                    screen.blit(font.render(title, True, config.DARK_GRAY), (530, row_y + 5))
+                    screen.blit(font.render(due_date_str, True, (200, 0, 0)), (670, row_y + 5))
+                    screen.blit(font.render(f"{gecikme_gun} Gün", True, (200, 0, 0)), (810, row_y + 5))
+
                 screen.set_clip(None)
 
             elif current_state == config.STATE_PROFILE:
